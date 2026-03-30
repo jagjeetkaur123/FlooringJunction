@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment files (NEVER commit these — contain passwords)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+
+# Prisma generated client
+Backened/node_modules/
+
+# Uploads (user files — don't commit)
+Backened/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc

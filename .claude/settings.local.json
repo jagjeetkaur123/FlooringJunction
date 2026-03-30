@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find 'c:\\\\Users\\\\Toni\\\\Desktop\\\\Jag1910\\\\CD carpet\\\\FM\\\\frontend\\\\Backened' -maxdepth 2 -name *.js -o -name index.js)"
+    ]
+  }
+}
