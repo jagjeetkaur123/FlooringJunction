@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  fullName  String?
+  email     String   @unique
+  password  String?
+  role      String   @default("technician")
+  createdAt DateTime @default(now())
+  jobs      Job[]    @relation("UserJobs")
+}
+
+model Customer {
+  id         Int      @id @default(autoincrement())
+  name       String
+  email      String?
+  phone      String?
+  address    String?
+  city       String?
+  state      String?
+  postcode   String?
+  referredBy String?  // Who referred this customer
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  jobs       Job[]
+}
+
+model Job {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Customer relationship
+  customerId  Int?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+
+  // Scheduling
+  startDate   DateTime?
+  endDate     DateTime?
+
+  // Assignment
+  assignedToId Int?
+  assignedTo   User?    @relation("UserJobs", fields: [assignedToId], references: [id])
+
+  // Cost & Sell pricing
+  costPrice   Float?   @default(0)
+  sellPrice   Float?   @default(0)
+  markup      Float?   @default(70)   // markup percentage
+  gstRate     Float?   @default(10)   // GST percentage
+  finalQuote  Float?   @default(0)    // final quoted amount
+
+  // Floor type — determines which template loads on Cost & Sell tab
+  floorType   String?  // "carpet" | "hard_flooring" | "other"
+
+  // Job meta
+  leadNumber    String?
+  jobCategory   String?
+  shop          String?
+  jobSource     String?  // how the customer found us (referral, website, walk-in …)
+  terms         String?
+  projectName   String?
+  jobRef        String?
+  quoteDate     DateTime?
+  initiatedDate DateTime?
+
+  // Contact at site (may differ from customer record)
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  contactFax   String?
+
+  // Site / installation address
+  siteStreet  String?
+  siteTown    String?
+  siteState   String?
+  siteZip     String?
+  siteCountry String?  @default("Australia")
+
+  // Billing address (if different from site)
+  billingStreet  String?
+  billingTown    String?
+  billingState   String?
+  billingZip     String?
+  billingCountry String?  @default("Australia")
+
+  // Relations
+  materials       Material[]
+  photos          Photo[]
+  timeline        Timeline[]
+  lineItems       LineItem[]
+  invoices        Invoice[]
+  scheduleEntries ScheduleEntry[]
+  mediaFiles      MediaFile[]
+}
+
+// ── Cost & Sell Line Items ────────────────────────────────────────────────────
+model LineItem {
+  id          Int      @id @default(autoincrement())
+  jobId       Int
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  tag         String?  @default("")
+  description String   @default("")
+  qty         Float    @default(1)
+  unitCost    Float    @default(0)
+  costTax     Float    @default(10)   // % e.g. 10 = 10% GST
+  type        String   @default("M") // M=Material, L=Labour, O=Other, H=Header
+  unitSell    Float    @default(0)
+  sellTax     Float    @default(10)
+  actOn       Boolean  @default(false)
+  isHeader    Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+// ── Billing ───────────────────────────────────────────────────────────────────
+model Invoice {
+  id              Int       @id @default(autoincrement())
+  jobId           Int
+  job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  invoiceNumber   String    @unique
+  invoiceDate     DateTime  @default(now())
+  dueDate         DateTime?
+
+  // Amounts (all ex-GST except totalAmount)
+  grossAmount       Float  @default(0)  // total value of work being invoiced
+  credit            Float  @default(0)  // any credit applied
+  retentionRelease  Float  @default(0)  // retention amount released
+  taxAmount         Float  @default(0)  // GST amount
+  totalAmount       Float  @default(0)  // gross - credit + retention + GST
+
+  status  String   @default("unpaid") // unpaid | partial | paid
+  sent    Boolean  @default(false)
+  sentAt  DateTime?
+  notes   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments Payment[]
+}
+
+model Payment {
+  id        Int      @id @default(autoincrement())
+  invoiceId Int
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  amount    Float
+  method    String   @default("bank_transfer") // cash | cheque | credit_card | eftpos | bank_transfer
+  reference String?
+  paidOn    DateTime @default(now())
+  notes     String?
+
+  createdAt DateTime @default(now())
+}
+
+// ── Schedule Entries ─────────────────────────────────────────────────────────
+model ScheduleEntry {
+  id             Int      @id @default(autoincrement())
+  jobId          Int
+  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  date           DateTime
+  time           String?
+  representative String   @default("")
+  details        String   @default("")
+  type           String   @default("installation")
+  status         String   @default("open")
+  createdAt      DateTime @default(now())
+}
+
+// ── Media Files ──────────────────────────────────────────────────────────────
+model MediaFile {
+  id          Int      @id @default(autoincrement())
+  jobId       Int
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  fileName    String
+  originalName String
+  mimeType    String
+  size        Int      @default(0)
+  category    String   @default("general")  // floor-plan | photo | document | general
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+// ── Product Catalogue ─────────────────────────────────────────────────────────
+model Product {
+  id          Int            @id @default(autoincrement())
+  supplier    String         @default("")   // e.g. "Godfrey", "Feltex"
+  name        String                         // e.g. "Greenridge 100% Solution Dyed Nylon"
+  category    String         @default("carpet")  // carpet | timber | underlay | adhesive | trim | other
+  unit        String         @default("M")   // M=linear metre, SQM=square metre, EA=each
+  width       Float?                          // e.g. 3.66
+  costPrice   Float          @default(0)     // buy price per unit (ex GST)
+  sellPrice   Float?                          // default sell price per unit (optional)
+  taxPercent  Float          @default(10)
+  notes       String?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  colors      ProductColor[]
+}
+
+model ProductColor {
+  id         Int     @id @default(autoincrement())
+  productId  Int
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  code       String  @default("")   // e.g. P5911
+  name       String                  // e.g. "11 Quartz"
+  costPrice  Float?                  // override cost price for this specific colour
+  isActive   Boolean @default(true)
+}
+
+// ── Loan Registry ─────────────────────────────────────────────────────────────
+model LoanEntry {
+  id           Int       @id @default(autoincrement())
+  loanedDate   DateTime  @default(now())
+  dueBack      DateTime?
+  loanedTo     String                    // customer name / phone
+  description  String    @default("")    // what samples were taken
+  returnedDate DateTime?
+  notes        String?
+  shop         String?
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Material {
+  id       Int    @id @default(autoincrement())
+  jobId    Int
+  name     String
+  quantity Float
+  unit     String
+  unitCost Float? @default(0)
+  job      Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model Photo {
+  id    Int    @id @default(autoincrement())
+  jobId Int
+  url   String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model Timeline {
+  id        Int      @id @default(autoincrement())
+  jobId     Int
+  message   String
+  createdAt DateTime @default(now())
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
